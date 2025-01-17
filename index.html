@@ -9,7 +9,8 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
+            background-color: #2c3e50;
+            color: white;
         }
 
         .container {
@@ -19,8 +20,7 @@
 
         .sidebar {
             width: 250px;
-            background-color: #2c3e50;
-            color: white;
+            background-color: #34495e;
             padding: 20px;
         }
 
@@ -76,11 +76,11 @@
         .main-content {
             flex: 1;
             padding: 20px;
-            background-color: #ecf0f1;
+            background-color: #34495e; /* Темный фон */
         }
 
         .signal-block {
-            background-color: white;
+            background-color: #2c3e50; /* Темный фон */
             border-radius: 5px;
             padding: 20px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -115,7 +115,7 @@
             color: red;
         }
 
-        .signal-timeframe, .signal-probability {
+        .signal-timeframe, .signal-analysis {
             margin: 5px 0;
         }
 
@@ -124,19 +124,41 @@
             text-align: center;
             font-size: 20px;
         }
+
+        .full-analysis {
+            margin-top: 20px;
+            font-size: 14px;
+            text-align: left;
+        }
+
+        .full-analysis div {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+            background-color: #34495e;
+        }
+
+        .full-analysis h3 {
+            margin-top: 0;
+            color: #e74c3c;
+        }
+
+        .emoji {
+            font-size: 20px;
+            margin-right: 5px;
+        }
     </style>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
     <div class="container">
         <div class="sidebar">
             <div class="logo">
                 <img src="https://api.dicebear.com/7.x/icons/svg?seed=tradepro" alt="Logo">
-                <h1 id="logo-text">KESA | TRADING SIGNALS</h1>
+                <h1 id="logo-text">Trade Signal</h1>
             </div>
             <div class="settings">
                 <div class="input-group">
-                    <label id="currency-label">Инструмент</label>
+                    <label id="currency-label">Instrument</label>
                     <select id="currency-pair">
                         <option>EUR/USD</option>
                         <option>BTC/USD</option>
@@ -156,17 +178,13 @@
                     </select>
                 </div>
                 <div class="input-group">
-                    <label id="timeframe-label">Время</label>
-                    <select id="timeframe">
-                        <option>1 минута</option>
-                        <option>3 минут</option>
-                        <option>5 минут</option>
-                    </select>
+                    <label id="timeframe-label">Time</label>
+                    <select id="timeframe"></select>
                 </div>
-                <button id="generate-btn">Получить сигнал</button>
+                <button id="generate-btn">Get Signal</button>
             </div>
             <div class="language-selector">
-                <label for="language">Язык</label>
+                <label for="language">Language</label>
                 <select id="language" onchange="changeLanguage()">
                     <option value="ru">Русский</option>
                     <option value="en">English</option>
@@ -179,14 +197,15 @@
         <div class="main-content">
             <div class="signal-block">
                 <div class="signal-header">
-                    <h2 id="signal-title">Сигнал</h2>
+                    <h2 id="signal-title">Signal</h2>
                     <span id="signal-time"></span>
                 </div>
                 <div id="signal-result" class="signal-result">
                     <div class="signal-placeholder">
-                        Нажмите "Получить сигнал"
+                        Click 'Get Signal'
                     </div>
                 </div>
+                <div id="full-analysis" class="full-analysis"></div>
             </div>
         </div>
     </div>
@@ -195,39 +214,96 @@
             const generateButton = document.getElementById("generate-btn");
             const signalResult = document.getElementById("signal-result");
             const signalTime = document.getElementById("signal-time");
+            const timeframeSelect = document.getElementById("timeframe");
+            const fullAnalysis = document.getElementById("full-analysis");
+
+            // Таймфреймы для разных языков
+            const timeframes = {
+                ru: ["1 минута", "3 минуты", "5 минут"],
+                en: ["1 minute", "3 minutes", "5 minutes"],
+                uz: ["1 daqiqa", "3 daqiqa", "5 daqiqa"],
+                es: ["1 minuto", "3 minutos", "5 minutos"],
+                pt: ["1 minuto", "3 minutos", "5 minutos"]
+            };
+
+            // Заполнение выпадающего списка таймфреймов
+            function fillTimeframeOptions(language) {
+                timeframeSelect.innerHTML = "";
+                timeframes[language].forEach((timeframe) => {
+                    const option = document.createElement("option");
+                    option.textContent = timeframe;
+                    timeframeSelect.appendChild(option);
+                });
+            }
+
+            // Инициализация таймфреймов
+            fillTimeframeOptions('en');
 
             let signalUpdateTimeout = null;
 
             generateButton.addEventListener("click", () => {
                 generateButton.disabled = true;
-                generateButton.textContent = "Ожидайте...";
+                generateButton.textContent = translations[document.getElementById("language").value].waiting;
 
                 if (signalUpdateTimeout) clearTimeout(signalUpdateTimeout);
 
                 signalUpdateTimeout = setTimeout(() => {
                     generateButton.disabled = false;
-                    generateButton.textContent = "Получить сигнал";
+                    generateButton.textContent = translations[document.getElementById("language").value].generateButton;
 
                     const currencyPair = document.getElementById("currency-pair").value;
-                    const timeframe = document.getElementById("timeframe").value.replace(/[^0-9]/g, '');
+                    const timeframe = timeframeSelect.value.replace(/[^0-9]/g, '');
 
                     const isBuy = Math.random() > 0.5;
-                    const accuracy = (Math.random() * 10 + 85).toFixed(2);
-                    const now = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
                     const language = document.getElementById("language").value;
+
+                    // Подробный анализ
+                    const analysis = {
+                        currencyPair: currencyPair,
+                        expiryTime: timeframe + " " + translations[language].minute,
+                        newsBackground: translations[language].newsBackground,
+                        volatility: translations[language].volatility,
+                        currentValue: (Math.random() * (0.623 - 0.620) + 0.620).toFixed(5),
+                        resistanceIndex: (Math.random() * (0.623 - 0.620) + 0.620).toFixed(5),
+                        supportIndex: (Math.random() * (0.621 - 0.618) + 0.618).toFixed(5),
+                        trendStrength: Math.floor(Math.random() * 100) + 1,
+                        volumeResult: Math.floor(Math.random() * 100) + 1 + "%",
+                        assetStrength: Math.floor(Math.random() * 100) + 1 + "%",
+                        followUpProbability: Math.floor(Math.random() * 100) + 1 + "%",
+                        successChance: (Math.random() * (100 - 87) + 87).toFixed(2) + "%",
+                    };
+
                     const signalDetails = `
                         <div class="signal-details">
-                            <div class="signal-pair">${currencyPair}</div>
+                            <div class="signal-pair">${analysis.currencyPair}</div>
                             <div class="signal-direction ${isBuy ? "green" : "red"}">
                                 ${isBuy ? translations[language].buy : translations[language].sell}
                             </div>
-                            <div class="signal-timeframe">${translations[language].timeframe}: ${timeframe}</div>
-                            <div class="signal-probability">${translations[language].accuracy}: ${accuracy}%</div>
+                            <div class="signal-timeframe">${translations[language].timeframe}: ${analysis.expiryTime}</div>
+                            <div class="signal-analysis">${translations[language].analysis}</div>
                         </div>
                     `;
                     signalResult.innerHTML = signalDetails;
                     signalTime.textContent = now;
+
+                    // Полный анализ
+                    fullAnalysis.innerHTML = `
+                        <h3>📊 ${translations[language].shortAnalysis}:</h3>
+                        <div>📰 ${translations[language].newsBackground}: ${analysis.newsBackground}</div>
+                        <div>📈 ${translations[language].volatility}: ${analysis.volatility}</div>
+                        <h3>🔍 ${translations[language].fullMarketAnalysis}:</h3>
+                        <div>💹 ${translations[language].currentValue}: ${analysis.currentValue}</div>
+                        <div>📉 ${translations[language].resistanceIndex}: ${analysis.resistanceIndex}</div>
+                        <div>📊 ${translations[language].supportIndex}: ${analysis.supportIndex}</div>
+                        <div>📈 ${translations[language].trendUp}: ${analysis.trendStrength}</div>
+                        <div>📊 ${translations[language].volumeResult}: ${analysis.volumeResult}</div>
+                        <div>📈 ${translations[language].assetStrength}: ${analysis.assetStrength}</div>
+                        <h3>🔮 ${translations[language].forecastInfo}:</h3>
+                        <div>📊 ${translations[language].followUpProbability}: ${analysis.followUpProbability}</div>
+                        <div>🎯 ${translations[language].successChance}: ${analysis.successChance}</div>
+                    `;
 
                 }, 3000);
             });
@@ -239,22 +315,52 @@
                 currencyLabel: "Инструмент",
                 timeframeLabel: "Время",
                 generateButton: "Получить сигнал",
+                waiting: "Ожидайте...",
                 signalTitle: "Сигнал",
                 signalPlaceholder: "Нажмите 'Получить сигнал'",
                 timeframe: "Таймфрейм",
-                accuracy: "Точность",
-                buy: "Покупка",
-                sell: "Продажа"
+                analysis: "Анализ",
+                minute: "минут",
+                shortAnalysis: "Краткий анализ",
+                fullMarketAnalysis: "Полный анализ рынка",
+                newsBackground: "Новостной фон",
+                volatility: "Волатильность",
+                currentValue: "Текущее значение",
+                resistanceIndex: "Индекс сопротивления",
+                supportIndex: "Индекс поддержки",
+                trendUp: "Тренд НА ПОВЫШЕНИЕ",
+                volumeResult: "Объёмный результат",
+                assetStrength: "Сила актива по объёму",
+                forecastInfo: "Информация по выполненному прогнозу",
+                followUpProbability: "Вероятность открытия сделки в догон",
+                successChance: "Шанс на успех сигнала",
+                buy: "Купить",
+                sell: "Продать"
             },
             en: {
                 logoText: "Trade Signal",
                 currencyLabel: "Instrument",
                 timeframeLabel: "Time",
                 generateButton: "Get Signal",
+                waiting: "Please wait...",
                 signalTitle: "Signal",
                 signalPlaceholder: "Click 'Get Signal'",
                 timeframe: "Timeframe",
-                accuracy: "Accuracy",
+                analysis: "Analysis",
+                minute: "minute",
+                shortAnalysis: "Short Analysis",
+                fullMarketAnalysis: "Full Market Analysis",
+                newsBackground: "News Background",
+                volatility: "Volatility",
+                currentValue: "Current Value",
+                resistanceIndex: "Resistance Index",
+                supportIndex: "Support Index",
+                trendUp: "Trend UP",
+                volumeResult: "Volume Result",
+                assetStrength: "Asset Strength",
+                forecastInfo: "Forecast Information",
+                followUpProbability: "Follow Up Probability",
+                successChance: "Success Chance",
                 buy: "Buy",
                 sell: "Sell"
             },
@@ -263,10 +369,25 @@
                 currencyLabel: "Asbob",
                 timeframeLabel: "Vaqt",
                 generateButton: "Signal Olish",
+                waiting: "Iltimos kuting...",
                 signalTitle: "Signal",
                 signalPlaceholder: "Signal Olish uchun bosing",
                 timeframe: "Vaqt oralig'i",
-                accuracy: "Aniqlik",
+                analysis: "Tahlil",
+                minute: "daqiqa",
+                shortAnalysis: "Qisqacha tahlil",
+                fullMarketAnalysis: "Bozorning to'liq tahlili",
+                newsBackground: "Yangiliklar fon",
+                volatility: "Volatillik",
+                currentValue: "Joriy qiymat",
+                resistanceIndex: "Qarshilik indeksi",
+                supportIndex: "Qo'llab-quvvatlash indeksi",
+                trendUp: "O'sish tendentsiyasi",
+                volumeResult: "Hajm natijasi",
+                assetStrength: "Aktiv kuchi",
+                forecastInfo: "Taxmin ma'lumotlari",
+                followUpProbability: "Takroriy savdo imkoniyati",
+                successChance: "Muvaffaqiyat imkoniyati",
                 buy: "Sotib olish",
                 sell: "Sotish"
             },
@@ -275,10 +396,25 @@
                 currencyLabel: "Instrumento",
                 timeframeLabel: "Tiempo",
                 generateButton: "Obtener Señal",
+                waiting: "Por favor espera...",
                 signalTitle: "Señal",
                 signalPlaceholder: "Haga clic en 'Obtener Señal'",
                 timeframe: "Intervalo de tiempo",
-                accuracy: "Precisión",
+                analysis: "Análisis",
+                minute: "minuto",
+                shortAnalysis: "Análisis breve",
+                fullMarketAnalysis: "Análisis de mercado completo",
+                newsBackground: "Fondo de noticias",
+                volatility: "Volatilidad",
+                currentValue: "Valor actual",
+                resistanceIndex: "Índice de resistencia",
+                supportIndex: "Índice de soporte",
+                trendUp: "Tendencia AL ALZA",
+                volumeResult: "Resultado de volumen",
+                assetStrength: "Fuerza del activo",
+                forecastInfo: "Información de pronóstico",
+                followUpProbability: "Probabilidad de seguimiento",
+                successChance: "Probabilidad de éxito",
                 buy: "Comprar",
                 sell: "Vender"
             },
@@ -287,10 +423,25 @@
                 currencyLabel: "Instrumento",
                 timeframeLabel: "Tempo",
                 generateButton: "Obter Sinal",
+                waiting: "Por favor aguarde...",
                 signalTitle: "Sinal",
                 signalPlaceholder: "Clique em 'Obter Sinal'",
                 timeframe: "Intervalo de tempo",
-                accuracy: "Precisão",
+                analysis: "Análise",
+                minute: "minuto",
+                shortAnalysis: "Análise curta",
+                fullMarketAnalysis: "Análise de mercado completa",
+                newsBackground: "Fundo de notícias",
+                volatility: "Volatilidade",
+                currentValue: "Valor atual",
+                resistanceIndex: "Índice de resistência",
+                supportIndex: "Índice de suporte",
+                trendUp: "Tendência DE ALTA",
+                volumeResult: "Resultado de volume",
+                assetStrength: "Força do ativo",
+                forecastInfo: "Informação de previsão",
+                followUpProbability: "Probabilidade de seguimento",
+                successChance: "Probabilidade de sucesso",
                 buy: "Comprar",
                 sell: "Vender"
             }
@@ -306,15 +457,7 @@
             document.getElementById("signal-title").textContent = translations[language].signalTitle;
             document.getElementById("signal-result").querySelector(".signal-placeholder").textContent = translations[language].signalPlaceholder;
 
-            const timeframeSelect = document.getElementById("timeframe");
-            timeframeSelect.innerHTML = "";
-
-            const timeframes = ["1 минута", "3 минут", "5 минут"]; // Убедитесь, что здесь указаны все языковые версии
-            timeframes.forEach((timeframe, index) => {
-                const option = document.createElement("option");
-                option.textContent = timeframe;
-                timeframeSelect.appendChild(option);
-            });
+            fillTimeframeOptions(language);
         }
     </script>
 </body>
